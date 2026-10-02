@@ -1,0 +1,52 @@
+﻿=== Claim 1: 85 series across 4 categories, genuine weighted combination ===
+{
+  "value": true,
+  "series_counts": {
+    "consumption": 21,
+    "production": 22,
+    "sales": 21,
+    "employment": 21
+  },
+  "total": 85,
+  "series_used_in_sample_release": 85,
+  "genuine_combination": true
+}
+
+=== Claim 2: vintage store reproduces published values ===
+{
+  "matched": 50,
+  "total": 50,
+  "max_abs_diff_stored_vs_recomputed": 0.0,
+  "oracle_matched": 8,
+  "oracle_total": 8,
+  "max_abs_diff_fast_vs_oracle": 1.4432899320127035e-15
+}
+
+=== Claim 3: revision profile, mean/median abs revision by lag ===
+{
+  "mean_abs_revision_1mo": 0.08130564521435789,
+  "median_abs_revision_1mo": 0.06721366367761522,
+  "n_periods_1mo": 104,
+  "mean_abs_revision_2mo": 0.07727434868556725,
+  "median_abs_revision_2mo": 0.061434607834886634,
+  "n_periods_2mo": 103,
+  "mean_abs_revision_3mo": 0.07587692795247637,
+  "median_abs_revision_3mo": 0.06093106062940783,
+  "n_periods_3mo": 102
+}
+
+=== Claim 4: publish gate refuses stale series ===
+{
+  "stale_caught": 12,
+  "k_stale": 12,
+  "false_refusals": 0,
+  "m_clean": 105
+}
+
+=== Claim 5: one-page Excel chart pack ===
+{
+  "value": true,
+  "sheet_count": 1,
+  "chart_count": 2,
+  "opened_ok": true
+}
