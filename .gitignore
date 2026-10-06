@@ -7,3 +7,7 @@ pytest_run.log
 # Regenerate with: python scripts/build_database.py
 # (writes data/activity_index.duckdb, about 1.3 MB, over this repo's size budget)
 data/activity_index.duckdb
+
+# Regenerate with: python scripts/run_nowcast.py
+# (writes data/nowcast_panel.duckdb, over this repo's size budget)
+data/nowcast_panel.duckdb

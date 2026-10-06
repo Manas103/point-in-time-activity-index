@@ -7,6 +7,14 @@ series, and a one-page Excel chart pack for a non-technical reader. Python 3.12,
 openpyxl. Every number below was measured on this machine by running the real code, not targeted
 in advance.
 
+Extended (Oct. 2026, Schonfeld Quantitative Research Intern req) with `nowcast/`, a point-in-time
+quarterly revenue nowcast on a simulated 120-name consumer spending panel: uneven per-name card
+panel coverage, revenue growth decomposed into a ticket-size and a transaction-count component,
+a mechanical run-rate extrapolation scored out of sample against a seasonal-naive baseline by
+coverage tercile, a pre-specified coverage floor, and a direct measurement of how much scoring
+against restated (hindsight) panel reads overstates the point-in-time gain. The original index's
+numbers are untouched.
+
 ## Why this exists
 
 The Chicago Fed publishes the CFNAI, a monthly weighted average of about 85 existing monthly
@@ -34,6 +42,21 @@ a non-technical reader can act on without touching the database.
   calendar or revision history.
 - **Machine and toolchain.** 8 physical / 16 logical cores, Windows 11 Home, Python 3.12.10,
   pandas 3.0.6, DuckDB 1.5.6, numpy 2.5.3, openpyxl 3.1.5, pytest 9.1.1.
+- **The nowcast's spending panel is a second, independent simulation, not the macro index's
+  series.** `nowcast/simulate.py` generates its own 120 simulated consumer names with their own
+  latent quarterly ticket-size and transaction-count growth; it shares no data with
+  `activityindex/simulate.py`, only the vintage-store discipline (see below).
+- **Revenue growth is a declared log-additive approximation.** Revenue = ticket size times
+  transaction count, so d(log revenue) is treated as d(log ticket size) + d(log transaction
+  count) exactly, by construction of the simulation; this is the standard first-order
+  decomposition, not a measured property of real revenue data.
+- **The nowcast and the seasonal-naive baseline are both fixed formulas, not fitted models.**
+  Neither has a parameter estimated from data, so "out of sample" means "evaluated over the held
+  out quarters" (the last 5 of 10 simulated years), not "on data a fit never saw."
+- **The coverage floor is pre-specified from the simulation's own declared parameters**, solved
+  in closed form for the coverage at which the nowcast's noise standard deviation equals the
+  signal's standard deviation, before any out-of-sample number was computed; see
+  `nowcast/model.py::coverage_floor`.
 
 ## Architecture
 
@@ -58,6 +81,22 @@ scripts/
 tests/
   test_vintage_store.py   point-in-time correctness, including the filter-before-dedup regression
   test_index_builder.py   equal-weight combination against a hand computation, lookahead guard
+
+nowcast/
+  config.py            seed, 120-name/40-quarter layout, coverage range, noise and revision
+                        schedule, the nowcast-as-of-date rule (2 of 3 months visible)
+  simulate.py           120 simulated names, AR(1) latent ticket/txn quarterly growth, uneven
+                         coverage, monthly decomposition, twice-revised panel vintages
+  panel_store.py        the DuckDB append-only panel store, same filter-before-dedupe query as
+                         vintage_store.py, applied to a per-name monthly panel instead
+  model.py               run-rate nowcast, seasonal-naive baseline, OOS R^2, coverage terciles,
+                         the pre-specified coverage floor, the restated-vs-PIT comparison
+  oracle.py              independent pure-Python point-in-time lookup, diffed against panel_store
+  measurements.py         the seven claim measurements
+scripts/
+  run_nowcast.py        builds the panel database and runs all seven measurements
+tests/
+  test_nowcast.py        panel-store invariants, oracle diff, OOS R^2 hand computation, terciles
 ```
 
 ### Why the point-in-time query filters before it dedupes
@@ -82,24 +121,39 @@ buggy code.
 
 ## Validation
 
-Default test run (`pytest tests`), 7 tests, all passing:
+Default test run (`pytest tests`), 14 tests, all passing (raw output in `docs/test_output.txt`):
 
 ```
 tests/test_index_builder.py::test_requires_minimum_history_months PASSED
 tests/test_index_builder.py::test_equal_weight_combination_matches_hand_calculation PASSED
 tests/test_index_builder.py::test_future_reference_periods_are_excluded_from_target PASSED
+tests/test_nowcast.py::test_name_count_and_coverage_spread PASSED
+tests/test_nowcast.py::test_monthly_decomposition_sums_to_quarterly_truth PASSED
+tests/test_nowcast.py::test_point_in_time_excludes_not_yet_visible PASSED
+tests/test_nowcast.py::test_oracle_matches_fast_path_point_in_time PASSED
+tests/test_nowcast.py::test_quarter_table_has_two_of_three_months_only PASSED
+tests/test_nowcast.py::test_oos_r2_hand_computation PASSED
+tests/test_nowcast.py::test_coverage_terciles_partition_all_names PASSED
 tests/test_vintage_store.py::test_point_in_time_returns_latest_visible_revision PASSED
 tests/test_vintage_store.py::test_point_in_time_excludes_vintages_not_yet_released PASSED
 tests/test_vintage_store.py::test_filter_before_dedup_regression PASSED
 tests/test_vintage_store.py::test_latest_periods_as_of_returns_plain_date_not_timestamp PASSED
-7 passed in 0.13s
+14 passed in 2.56s
 ```
 
-`scripts/run_measurements.py` is the reference run behind every number in "Measured results"
-below; its full JSON output is in `docs/measurement_output.txt`. Claim 2 is checked two ways:
-50 sampled published values recomputed point-in-time against the stored value (the production
-code path diffed against itself over time), and 8 of those also recomputed by the independent
-pure-Python oracle (a genuinely separate implementation diffed against the fast path).
+`scripts/run_measurements.py` is the reference run behind every macro-index number in "Measured
+results" below; its full JSON output is in `docs/measurement_output.txt`. Claim 2 is checked two
+ways: 50 sampled published values recomputed point-in-time against the stored value (the
+production code path diffed against itself over time), and 8 of those also recomputed by the
+independent pure-Python oracle (a genuinely separate implementation diffed against the fast
+path).
+
+**Nowcast validation.** `scripts/run_nowcast.py` is the reference run behind every nowcast
+number below; its full JSON output is in `docs/nowcast_output.txt`. `test_point_in_time_excludes_not_yet_visible`
+pins that a month's first-print (R0/R1) is all that is visible at the nowcast date, and that the
+third month of the quarter is entirely absent from the point-in-time snapshot.
+`test_oracle_matches_fast_path_point_in_time` diffs 30 sampled point-in-time reads against an
+independent pure-Python loop (`nowcast/oracle.py`, no DuckDB, no pandas) to max abs diff 0.0.
 
 ## Findings
 
@@ -115,6 +169,27 @@ that discriminated the cause from a logic bug: the error was a `TypeError` on th
 itself, not a wrong value, and it disappeared identically for every query once the dtype was
 normalized, which pointed at a type mismatch introduced between library versions, not a flaw in
 the filter-then-dedupe ordering.
+
+**The top-coverage-tercile nowcast beat its 0.27 target by a wide margin (measured 0.75), and the
+bottom-coverage-tercile nowcast was not merely flat but actively worse than the baseline (measured
+-3.01), both reported as measured rather than adjusted.** The seasonal-naive baseline is a weak
+predictor here (the AR(1) mean-reversion parameter, `AR1_RHO = 0.35`, means a quarter's true
+growth correlates only loosely with the same quarter a year earlier), so a low-noise run-rate
+extrapolation from well-covered names clears it easily; for thinly covered names the
+extrapolation's own sampling noise is large enough relative to the signal that the nowcast adds
+pure noise on top of a baseline that, however weak, at least reflects a real past value, driving
+the OOS R^2 well below zero rather than merely to zero. Neither result was produced by adjusting
+the simulation after seeing it; the nowcast formula and the AR(1) parameters were fixed in
+`nowcast/config.py` before `scripts/run_nowcast.py` was ever run.
+
+**The pre-specified coverage floor admitted 44 of 120 names, not the targeted 54, and restated
+scoring overstated the top-tercile gain by 25.6%, not the targeted 38%.** Both floors were
+computed once, from the closed-form formula in `nowcast/model.py::coverage_floor` and
+`restated_overstatement_pct` respectively, using only the simulation's own declared parameters;
+neither number was tuned toward its target afterward, consistent with this playbook's rule
+against tuning a benchmark to produce a target. The direction of both findings is the one the
+resume claim depends on (a real minority of names clear the floor; restated scoring really does
+overstate the point-in-time gain), only the exact magnitude differs.
 
 ## Measured results
 
@@ -132,6 +207,21 @@ Machine: 8 physical / 16 logical cores, Windows 11 Home, Python 3.12.10, pandas 
 Raw output: `docs/measurement_output.txt` (all five measurements as JSON), the exact command
 that produced it is below.
 
+**Nowcast measured results.** Same machine as above. 120 simulated consumer names, 40 simulated
+quarters, 20 held out as the OOS window.
+
+| Claim | Target | Measured | Meets claim |
+|---|---|---|---|
+| Quarterly revenue nowcast for 120 simulated consumer names | 120 | **120** names, nowcast run over 20 OOS quarters | yes |
+| Spending panel with uneven per-name coverage | uneven | coverage ranges **1.05% to 77.6%** of panel penetration, coefficient of variation **1.17** | yes |
+| Revenue growth split into ticket size and transaction count | yes | ticket + transaction-count growth reproduces revenue growth exactly (max abs diff **0.0**) | yes |
+| OOS R^2 over seasonal-naive baseline, top coverage tercile | 0.27 | **0.751** (800 name-quarter observations) | yes (exceeded) |
+| OOS R^2 over seasonal-naive baseline, bottom coverage tercile | no measurable gain | **-3.01** (800 name-quarter observations), actively worse than the baseline | yes (no gain, and then some) |
+| Coverage floor admitting names as the deliverable | 54 of 120 | **44 of 120** (floor coverage **16.9%**, solved in closed form, see Findings) | no |
+| Restated-vs-point-in-time overstatement of the top-tercile gain | 38% | **25.6%** (see Findings) | no |
+
+Raw output: `docs/nowcast_output.txt`, the exact command that produced it is below.
+
 ## Building and running
 
 ```bash
@@ -139,16 +229,18 @@ cd projects/point-in-time-activity-index
 "C:\Users\Manas\AppData\Local\Programs\Python\Python312\python.exe" -m venv venv
 venv\Scripts\python.exe -m pip install -r requirements.txt
 
-venv\Scripts\python.exe -m pytest tests -v                   # 7 tests, <1s
+venv\Scripts\python.exe -m pytest tests -v                   # 14 tests, <3s
 
 venv\Scripts\python.exe scripts\build_database.py             # writes data/activity_index.duckdb
 venv\Scripts\python.exe scripts\build_excel.py                # writes docs/activity_index_release_pack.xlsx
 venv\Scripts\python.exe scripts\run_measurements.py > docs\measurement_output.txt
+venv\Scripts\python.exe scripts\run_nowcast.py > docs\nowcast_output.txt   # writes data/nowcast_panel.duckdb
 ```
 
-`data/activity_index.duckdb` is gitignored (about 1.3 MB, over this repository's size budget);
-regenerate it with `build_database.py` above. `docs/activity_index_release_pack.xlsx` is small
-enough to commit directly and is included as a real sample artifact.
+`data/activity_index.duckdb` and `data/nowcast_panel.duckdb` are gitignored (about 1.3 MB each,
+over this repository's size budget); regenerate them with `build_database.py` and
+`run_nowcast.py` above. `docs/activity_index_release_pack.xlsx` is small enough to commit
+directly and is included as a real sample artifact.
 
 ## Sibling comparison
 
@@ -172,3 +264,12 @@ not drawn from any real statistical agency's actual release calendar. The revisi
 (claim 3) is a descriptive measurement, not a pass/fail target, by the claim's own wording; there
 is no "correct" revision magnitude to compare it against since the underlying revision process is
 itself synthetic.
+
+The nowcast's spending panel is entirely synthetic, including the coverage distribution, the
+noise model, and the revision schedule; no real card-panel or point-of-sale data is used. Revenue
+growth is a declared log-additive approximation of ticket size times transaction count, not a
+measured property of real revenue. The nowcast and the seasonal-naive baseline are both fixed
+formulas with no fitted parameters; "out of sample" means "over the held-out quarters," not "on
+data a model was never shown." The coverage floor (44 of 120) and the restated-overstatement
+percentage (25.6%) both fell short of the resume's targeted 54 and 38%; see Findings for the
+closed-form derivation and why neither was tuned toward its target after the fact.
