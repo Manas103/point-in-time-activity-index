@@ -4,8 +4,8 @@ A monthly weighted activity index, rebuilt from 85 simulated source series acros
 categories, with a genuine vintage store that reproduces any published value exactly as it was
 known on its own release date, a measured revision profile, a publish gate that refuses a stale
 series, and a one-page Excel chart pack for a non-technical reader. Python 3.12, DuckDB, pandas,
-openpyxl. Every number below was measured on this machine by running the real code, not targeted
-in advance.
+openpyxl, statsmodels. Every number below was measured on this machine by running the real code,
+not targeted in advance.
 
 Extended (Oct. 2026, Schonfeld Quantitative Research Intern req) with `nowcast/`, a point-in-time
 quarterly revenue nowcast on a simulated 120-name consumer spending panel: uneven per-name card
@@ -14,6 +14,16 @@ a mechanical run-rate extrapolation scored out of sample against a seasonal-naiv
 coverage tercile, a pre-specified coverage floor, and a direct measurement of how much scoring
 against restated (hindsight) panel reads overstates the point-in-time gain. The original index's
 numbers are untouched.
+
+Extended a second time (Oct. 2026, Two Sigma Quantitative Researcher Intern req) with
+`energy_nowcast/`, a nowcast of the first print of monthly U.S. industrial production from three
+genuinely real, public, release-stamped sources: EIA-930 hourly demand for 25 real balancing
+authorities, NOAA CPC population-weighted degree days, and the Philadelphia Fed's real-time
+first/second/third/most-recent release history for the Industrial Production Index. An expanding-
+window, point-in-time walk-forward measures an energy-demand nowcast against an AR(1) baseline,
+against a weather-only control, and against the same model scored on hindsight-revised data
+instead of the first print. Unlike `activityindex/` and `nowcast/`, nothing here is simulated. The
+original index's and the consumer-spending nowcast's numbers are both untouched.
 
 ## Why this exists
 
@@ -41,7 +51,7 @@ a non-technical reader can act on without touching the database.
   invented for this project**, not drawn from any real statistical agency's actual release
   calendar or revision history.
 - **Machine and toolchain.** 8 physical / 16 logical cores, Windows 11 Home, Python 3.12.10,
-  pandas 3.0.6, DuckDB 1.5.6, numpy 2.5.3, openpyxl 3.1.5, pytest 9.1.1.
+  pandas 3.0.6, DuckDB 1.5.6, numpy 2.5.3, openpyxl 3.1.5, pytest 9.1.1, statsmodels 0.15.0.
 - **The nowcast's spending panel is a second, independent simulation, not the macro index's
   series.** `nowcast/simulate.py` generates its own 120 simulated consumer names with their own
   latent quarterly ticket-size and transaction-count growth; it shares no data with
@@ -57,6 +67,45 @@ a non-technical reader can act on without touching the database.
   in closed form for the coverage at which the nowcast's noise standard deviation equals the
   signal's standard deviation, before any out-of-sample number was computed; see
   `nowcast/model.py::coverage_floor`.
+- **`energy_nowcast/` is entirely real data, the opposite framing of the rest of this repo.** EIA
+  hourly demand, NOAA degree days and the Philadelphia Fed's industrial-production release history
+  are all genuine downloads from public sources (see "Building and running" for the exact URLs);
+  nothing in this extension is generated from a seed.
+- **The real EIA-930 bulk history only goes back to 2019-01, not 10 years.** The resume-shaped
+  target was "10 years of hourly electricity demand"; the real bulk file
+  (`https://www.eia.gov/opendata/bulk/EBA.zip`) starts its hourly balancing-authority demand series
+  on 2019-01-01, giving 7.7 years, not 10. This is reported as measured rather than padded with a
+  shorter, invented pre-2019 history.
+- **25 real balancing authorities, not EIA's own aggregate "trading regions".** The bulk file's
+  `EBA.<code>-ALL.D.H` series include both genuine balancing authorities (`PJM`, `MISO`, `CISO`,
+  ...) and EIA's own cross-BA rollups (`CAL`, `CENT`, `MIDW`, `TEX`, `US48`, ...,
+  `energy_nowcast/config.py::EIA_AGGREGATE_REGION_CODES`); only the former are used, so no hour of
+  demand is ever counted twice.
+- **Degree days are an unweighted mean across NOAA's reporting CONUS states, not NOAA's own
+  population weighting.** NOAA's `StatesCONUS.{Heating,Cooling}.{year}.txt` files are already
+  population-weighted within each state; combining states into one national series here by a plain
+  mean is a declared simplification of a true national population weighting, the same kind of
+  honest shortcut `activityindex/index_builder.py` already takes for the CFNAI's PCA weights.
+- **"Weather-normalized" means a calendar-month anomaly, not a regression residual.** Both the
+  demand-growth feature and the two degree-day features are turned into deviations from the
+  expanding, strictly-prior-years mean for that same calendar month
+  (`energy_nowcast/features.py::calendar_month_anomaly`) before any model sees them. This is a
+  point-in-time-safe deseasonalizer, not a claim that it recovers the real CFNAI-grade seasonal
+  adjustment the Federal Reserve itself applies to the industrial production index.
+- **One real balancing authority has a real reporting gap.** `WACM` has no EIA-930 demand data at
+  all for 2026-05 through 2026-08 in the bulk file (`ba_month_cells_under_90pct_hourly_completeness`
+  in `docs/real_ingest_output.txt` shows the drop starting mid-March 2026); the aggregate monthly
+  demand feature for those 4 of 92 months is a true sum of the other 24 balancing authorities, not
+  25, which is a genuine EIA reporting gap rather than a bug in this extension.
+- **Every out-of-sample number is from one fixed walk-forward design, tried three times before
+  being reported.** `MIN_TRAIN_MONTHS = 36`, an expanding window, and the feature set in
+  `measurements.py` were the result of three genuine attempts (raw percent-growth degree days,
+  which blew up near each hemisphere's seasonal zero-crossing; a deseasonalized demand feature;
+  and an industrial-belt-only balancing-authority subset, which was discarded specifically because
+  cherry-picking regions after seeing the result would be tuning a benchmark toward its target).
+  The reported numbers are the second attempt's (all 25 balancing authorities, deseasonalized
+  demand): see Findings for why the third attempt was not kept even though it looked marginally
+  better.
 
 ## Architecture
 
@@ -97,6 +146,23 @@ scripts/
   run_nowcast.py        builds the panel database and runs all seven measurements
 tests/
   test_nowcast.py        panel-store invariants, oracle diff, OOS R^2 hand computation, terciles
+
+energy_nowcast/
+  config.py             25 real balancing-authority codes, the excluded EIA aggregate-region
+                         codes, MIN_TRAIN_MONTHS
+  features.py           pct_growth and calendar_month_anomaly, pure functions shared by the fast
+                         path and the oracle
+  ingest.py              parsers for the EIA bulk-file export, the NOAA degree-day text files and
+                          the Philly Fed release-history workbook, plus the DuckDB real_* tables
+  model.py                statsmodels OLS inside the expanding-window, point-in-time walk-forward
+  oracle.py                independent hand-rolled normal-equations OLS, no numpy/statsmodels
+  measurements.py           builds every feature/target series and runs both scoring scenarios
+scripts/
+  ingest_real_data.py    builds data/real_monthly_panel.csv from the three raw downloads
+  run_real_nowcast.py    runs every measurement from the committed panel, prints JSON
+tests/
+  test_real_nowcast.py   calendar-month-anomaly correctness, oracle-vs-fast-path agreement, a
+                          leakage guard proving a later month never changes an earlier prediction
 ```
 
 ### Why the point-in-time query filters before it dedupes
@@ -111,6 +177,19 @@ should not have been visible yet. This repository inherits that discipline delib
 than relearning it, and `test_filter_before_dedup_regression` pins the correct order with the
 exact scenario that would expose the bug if the query were ever rewritten the wrong way around.
 
+### How the weather-confound measurement is defined
+
+Four walk-forward models share the same expanding-window loop
+(`model.walk_forward_ols`): an AR(1) baseline (industrial production's own prior month), a
+demand-only model, a weather-only model (the two degree-day anomalies), and the full model (all
+three features together). The "apparent signal" in demand is that demand-only model's own
+out-of-sample R^2; the share of it that is really just weather is `1 - (R2_full - R2_weather_only)
+/ R2_demand_only`, i.e. how much of the full model's advantage over weather-alone is left once
+demand is added, relative to what demand looked like it was worth on its own. This is only a
+well-defined fraction when the demand-only R^2 is itself positive; when it is at or below zero
+there is no apparent signal to attribute to weather in the first place, which is exactly what this
+repository's own measurement below found.
+
 ### Why the oracle only imports config.py
 
 `oracle.py`'s pure-Python recomputation imports nothing from `index_builder.py` or
@@ -121,7 +200,7 @@ buggy code.
 
 ## Validation
 
-Default test run (`pytest tests`), 14 tests, all passing (raw output in `docs/test_output.txt`):
+Default test run (`pytest tests`), 22 tests, all passing (raw output in `docs/test_output.txt`):
 
 ```
 tests/test_index_builder.py::test_requires_minimum_history_months PASSED
@@ -138,7 +217,15 @@ tests/test_vintage_store.py::test_point_in_time_returns_latest_visible_revision 
 tests/test_vintage_store.py::test_point_in_time_excludes_vintages_not_yet_released PASSED
 tests/test_vintage_store.py::test_filter_before_dedup_regression PASSED
 tests/test_vintage_store.py::test_latest_periods_as_of_returns_plain_date_not_timestamp PASSED
-14 passed in 2.56s
+tests/test_real_nowcast.py::test_panel_has_25_balancing_authorities_and_real_date_range PASSED
+tests/test_real_nowcast.py::test_calendar_month_anomaly_uses_only_strictly_prior_years PASSED
+tests/test_real_nowcast.py::test_calendar_month_anomaly_never_sees_a_same_or_later_index PASSED
+tests/test_real_nowcast.py::test_pct_growth_handles_zero_and_missing PASSED
+tests/test_real_nowcast.py::test_oracle_matches_fast_path_walk_forward PASSED
+tests/test_real_nowcast.py::test_walk_forward_never_trains_on_the_target_month_or_later PASSED
+tests/test_real_nowcast.py::test_sql_vs_python_total_demand_matches_exactly PASSED
+tests/test_real_nowcast.py::test_run_all_measurements_reports_every_claim_shape PASSED
+22 passed in 2.24s
 ```
 
 `scripts/run_measurements.py` is the reference run behind every macro-index number in "Measured
@@ -154,6 +241,20 @@ pins that a month's first-print (R0/R1) is all that is visible at the nowcast da
 third month of the quarter is entirely absent from the point-in-time snapshot.
 `test_oracle_matches_fast_path_point_in_time` diffs 30 sampled point-in-time reads against an
 independent pure-Python loop (`nowcast/oracle.py`, no DuckDB, no pandas) to max abs diff 0.0.
+
+**Real-nowcast validation.** `scripts/run_real_nowcast.py` is the reference run behind every
+`energy_nowcast` number below; its full JSON output is in `docs/real_nowcast_output.txt`.
+`test_oracle_matches_fast_path_walk_forward` diffs every walk-forward prediction from
+`model.walk_forward_ols` (statsmodels) against `oracle.walk_forward_ols_oracle` (hand-rolled
+normal equations, no numpy/statsmodels) across all four feature sets used anywhere in this
+extension, to max abs diff under 1e-6. `test_walk_forward_never_trains_on_the_target_month_or_later`
+appends one extra month with a deliberately extreme injected value and asserts every earlier
+prediction is byte-for-byte unchanged, the direct regression test for the point-in-time rule.
+`test_calendar_month_anomaly_never_sees_a_same_or_later_index` pins the same rule for the
+deseasonalizer itself with a planted future outlier. `test_sql_vs_python_total_demand_matches_exactly`
+cross-checks the DuckDB `real_monthly_panel` table's own `SUM(demand_mwh) GROUP BY year, month`
+against the wide CSV panel's independent pandas sum, max abs diff 0.0 (also reported live by
+`scripts/ingest_real_data.py`, see `docs/real_ingest_output.txt`).
 
 ## Findings
 
@@ -191,6 +292,50 @@ against tuning a benchmark to produce a target. The direction of both findings i
 resume claim depends on (a real minority of names clear the floor; restated scoring really does
 overstate the point-in-time gain), only the exact magnitude differs.
 
+**The real EIA bulk file's hourly timestamps are `"20190101T00"` strings with no separator a
+`datetime` parser recognizes out of the box.** `strptime(period, "%Y%m%dT%H")` was the first
+thing tried and it worked; the actual bug was upstream of parsing, in the download itself:
+`api.eia.gov`'s query-string brackets (`facets[respondent][]=...`) are valid for the API but curl's
+default globbing parses `[0]` as a numeric range and fails with `bad range in URL position 81`
+until `-g` disables globbing. The bulk `EBA.zip` export was used instead of the paginated API
+specifically to avoid the API's low per-key rate limit (`X-Ratelimit-Limit: 10`) across what would
+otherwise have been thousands of paginated calls for 25 balancing authorities over 7.7 years.
+
+**The Philadelphia Fed's `ipt_first_second_third.xlsx` would not open in openpyxl at all.** The
+error was `TypeError: expected <class 'datetime.datetime'>` inside `read_properties()`, from
+`docProps/core.xml`'s `<dcterms:modified>2026-09-23T 9:25:16-04:00</dcterms:modified>`: a stray
+space between `T` and the hour digit, which fails ISO-8601 parsing before a single worksheet cell
+is ever read. The measurement that found the real cause rather than a decoy: the traceback pointed
+at `DocumentProperties.from_tree`, a metadata reader, not a cell reader, which ruled out a
+worksheet-level problem; unzipping the `.xlsx` and reading `docProps/core.xml` directly showed the
+exact malformed timestamp. The fix rewrites that one XML entry (`T\s+(\d):` to `T0\1:`) in a copy
+of the file before `ingest.load_ip_releases` ever calls `openpyxl.load_workbook`.
+
+**Three genuine attempts at the weather-confound design, and the real answer was "there is no
+apparent signal to explain away."** Attempt 1 used raw percent growth for the two degree-day
+features; both exploded to R^2 in the hundreds of percent during each series' seasonal
+near-zero crossing (heating degree days near 0 in July, cooling degree days near 0 in January),
+an obvious division-by-near-zero artifact rather than a real result. Attempt 2 replaced percent
+growth with the calendar-month anomaly used everywhere in this extension now, which fixed the
+blowups but left demand's own out-of-sample R^2 at -0.0020 (first-print scoring): statistically no
+better than predicting the sample mean. Attempt 3 restricted the demand feature to 8 industrial-
+belt balancing authorities (`MISO`, `TVA`, `DUK`, `SOCO`, `PJM`, `AECI`, `SC`, `SCEG`) instead of
+all 25, which nudged demand's own R^2 to -0.0009, still not positive, and was discarded as the
+reported design specifically because choosing that subset only after seeing attempt 2's result
+would itself be tuning a benchmark toward a target. Attempt 2's numbers, from all 25 balancing
+authorities, are what is reported below. With no positive apparent signal in any attempt, the
+"weather explained 62% of it" claim has nothing to attribute: the honest finding is that real
+aggregate electricity demand growth, deseasonalized this way, does not nowcast seasonally-adjusted
+industrial production's first-print growth at all over this 7.7-year real window, before weather
+is even brought into it.
+
+**The AR(1) baseline itself does not clear a positive out-of-sample R^2 either.** First-print
+scoring measured -0.124; revised scoring measured -0.327. Both are consistent with industrial
+production's month-over-month growth rate behaving close to a random walk at this frequency: a
+single lag carries close to no genuine predictive content out of sample, which is itself a
+real, if unglamorous, measured property of the target series, not an artifact of this
+extension's feature engineering.
+
 ## Measured results
 
 Machine: 8 physical / 16 logical cores, Windows 11 Home, Python 3.12.10, pandas 3.0.6, DuckDB
@@ -222,6 +367,23 @@ quarters, 20 held out as the OOS window.
 
 Raw output: `docs/nowcast_output.txt`, the exact command that produced it is below.
 
+**Real-nowcast measured results.** Same machine as above. 92 months of real overlap (2019-01 to
+2026-08) across all three sources, 25 real balancing authorities, expanding-window walk-forward
+with a 36-month minimum training window.
+
+| Claim | Target | Measured | Meets claim |
+|---|---|---|---|
+| 10 years of real hourly electricity demand across 20+ balancing authorities | 10 yrs, 20+ BAs | **25 balancing authorities** (exceeded); **7.7 years** of real EIA-930 history (2019-01 to 2026-08), the bulk file's own start date, not 10 | no (years) / yes (BAs) |
+| Degree-day weather and vintage macro releases joined as real public sources | real sources | **NOAA CPC** state degree days and the **Philadelphia Fed** real-time industrial-production release history, both genuinely downloaded, joined on (year, month) | yes |
+| Every feature stamped with its own publication timestamp | yes | Not literally true: EIA/NOAA features are assumed available within days of month-end (their real publication lag), and only the industrial-production target carries real first/second/third/most-recent release vintages; no per-value EIA/NOAA publication timestamp was obtained (the bulk file is a single current snapshot, not a vintage history) | no |
+| 0.31 out-of-sample R^2 nowcasting the first print of industrial production | 0.31 | **-0.191** (demand + both degree-day anomalies, 53 OOS months) | no |
+| 0.18 out-of-sample R^2 for the AR(1) baseline | 0.18 | **-0.124** (52 OOS months) | no |
+| Weather-normalizing the load series removed 62% of the apparent signal | 62% | **undefined**: the demand-only OOS R^2 (-0.0020) never cleared zero, so there was no positive apparent signal for weather to explain away (see Findings) | no |
+| Scoring on revised instead of first-print data overstated the gain 1.6x | 1.6x | **0.073x** (the full model's gain over AR1 was -0.0049 under revised scoring vs -0.0667 under first-print scoring; both gains are negative, so "overstated" does not even hold in direction) | no |
+
+Raw output: `docs/real_nowcast_output.txt` and `docs/real_ingest_output.txt`, the exact commands
+that produced them are below.
+
 ## Building and running
 
 ```bash
@@ -241,6 +403,32 @@ venv\Scripts\python.exe scripts\run_nowcast.py > docs\nowcast_output.txt   # wri
 over this repository's size budget); regenerate them with `build_database.py` and
 `run_nowcast.py` above. `docs/activity_index_release_pack.xlsx` is small enough to commit
 directly and is included as a real sample artifact.
+
+**Real-nowcast data.** `data/real_monthly_panel.csv` (about 30 KB, 92 months x 25 balancing
+authorities plus degree days and the four industrial-production release columns) is small enough
+to commit directly, the same precedent as the Excel release pack above, and is included so every
+measurement below can be reproduced without re-downloading anything. The three raw sources behind
+it are not committed (about 700 MB combined):
+
+```bash
+# EIA-930 hourly demand, all balancing authorities, bulk file (694 MB; curl -g disables globbing,
+# needed because facets[respondent][] would otherwise be parsed as a numeric range by curl itself)
+curl -g -o EBA.zip "https://www.eia.gov/opendata/bulk/EBA.zip"
+# filter to hourly UTC demand (EBA.<code>-ALL.D.H) before anything else touches the 4.37 GB
+# uncompressed export; see energy_nowcast/ingest.py::load_eia_demand_monthly for the equivalent
+# streaming filter run directly against the zip's one EBA.txt member
+
+# NOAA CPC population-weighted degree days, one small file per year/kind
+curl -o StatesCONUS.Heating.<year>.txt "https://ftp.cpc.ncep.noaa.gov/htdocs/degree_days/weighted/daily_data/<year>/StatesCONUS.Heating.txt"
+curl -o StatesCONUS.Cooling.<year>.txt "https://ftp.cpc.ncep.noaa.gov/htdocs/degree_days/weighted/daily_data/<year>/StatesCONUS.Cooling.txt"
+
+# Philadelphia Fed real-time first/second/third/most-recent industrial-production release history
+curl -o ipt_first_second_third.xlsx "https://www.philadelphiafed.org/-/media/FRBP/Assets/Surveys-And-Data/real-time-data/data-files/xlsx/ipt_first_second_third.xlsx"
+# fix the malformed docProps/core.xml timestamp (see Findings) before openpyxl can open it,
+# then:
+venv\Scripts\python.exe scripts\ingest_real_data.py --eia-jsonl <filtered.jsonl> --noaa-dir <dir> --ip-xlsx <fixed.xlsx> --out-csv data\real_monthly_panel.csv
+venv\Scripts\python.exe scripts\run_real_nowcast.py data\real_monthly_panel.csv > docs\real_nowcast_output.txt
+```
 
 ## Sibling comparison
 
@@ -273,3 +461,20 @@ formulas with no fitted parameters; "out of sample" means "over the held-out qua
 data a model was never shown." The coverage floor (44 of 120) and the restated-overstatement
 percentage (25.6%) both fell short of the resume's targeted 54 and 38%; see Findings for the
 closed-form derivation and why neither was tuned toward its target after the fact.
+
+`energy_nowcast/` undershoots its resume claims across the board (see Measured results above),
+and the shortfalls are structural, not a matter of more tuning. The real EIA-930 bulk history
+starts 2019-01, giving 7.7 years, not 10; no amount of feature engineering changes a download's
+own start date. Degree days are an unweighted mean across NOAA's reporting CONUS states, a
+declared simplification of true population weighting. "Every feature stamped with its own
+publication timestamp" is only genuinely true for the industrial-production target, which really
+does carry first/second/third/most-recent release vintages; the EIA and NOAA features are instead
+assumed available within days of month-end, the real-world publication lag for both sources, but
+not backed by a per-value vintage history the way the macro target is. Most importantly, the
+demand-only model's own out-of-sample R^2 never cleared zero in any of the three attempts tried
+(see Findings), so the "62% of the apparent signal was weather" claim has no apparent signal to
+measure a share of, and the headline R^2 and AR(1) numbers are both negative rather than 0.31 and
+0.18. The honest finding this extension actually supports is narrower than the resume bullet: real
+aggregate electricity demand, deseasonalized this way, carries no detectable out-of-sample
+nowcasting power over seasonally-adjusted industrial production's first-print growth at a monthly
+frequency over this window, and neither does a one-lag AR(1) baseline.

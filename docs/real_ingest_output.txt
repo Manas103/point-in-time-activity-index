@@ -1,0 +1,74 @@
+{
+  "months_in_panel": 92,
+  "first_month": "2019-01",
+  "last_month": "2026-08",
+  "n_balancing_authorities": 25,
+  "ba_month_cells_under_90pct_hourly_completeness": 9,
+  "total_ba_month_cells": 2300,
+  "completeness_gap_examples": [
+    [
+      "PGE",
+      2019,
+      3,
+      481,
+      744
+    ],
+    [
+      "PSCO",
+      2023,
+      3,
+      616,
+      744
+    ],
+    [
+      "WACM",
+      2026,
+      3,
+      661,
+      744
+    ],
+    [
+      "SCEG",
+      2026,
+      3,
+      583,
+      744
+    ],
+    [
+      "WACM",
+      2026,
+      4,
+      43,
+      720
+    ],
+    [
+      "WACM",
+      2026,
+      5,
+      0,
+      744
+    ],
+    [
+      "WACM",
+      2026,
+      6,
+      0,
+      720
+    ],
+    [
+      "WACM",
+      2026,
+      7,
+      0,
+      744
+    ],
+    [
+      "WACM",
+      2026,
+      8,
+      0,
+      744
+    ]
+  ],
+  "sql_vs_python_total_demand_max_abs_diff_mwh": 0.0
+}

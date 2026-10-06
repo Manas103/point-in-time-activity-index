@@ -1,0 +1,30 @@
+{
+  "n_months_overlap": 92,
+  "n_balancing_authorities": 25,
+  "first_print_scoring": {
+    "r2_ar1": -0.12388672464639905,
+    "n_ar1": 52,
+    "r2_demand_only": -0.002029973172290811,
+    "n_demand_only": 53,
+    "r2_weather_only": -0.25452164885235096,
+    "n_weather_only": 53,
+    "r2_full": -0.1906228598544224,
+    "n_full": 53,
+    "gain_over_ar1": -0.06673613520802335,
+    "incremental_demand_over_weather": 0.06389878899792856
+  },
+  "revised_scoring": {
+    "r2_ar1": -0.3266059596158817,
+    "n_ar1": 56,
+    "r2_demand_only": -0.23946072787889494,
+    "n_demand_only": 56,
+    "r2_weather_only": -0.33224488794068696,
+    "n_weather_only": 56,
+    "r2_full": -0.33149963931992965,
+    "n_full": 56,
+    "gain_over_ar1": -0.004893679704047971,
+    "incremental_demand_over_weather": 0.0007452486207573106
+  },
+  "overstatement_ratio_revised_over_first": 0.07332878490481763,
+  "weather_explained_fraction_of_apparent_demand_signal": null
+}

@@ -11,3 +11,8 @@ data/activity_index.duckdb
 # Regenerate with: python scripts/run_nowcast.py
 # (writes data/nowcast_panel.duckdb, over this repo's size budget)
 data/nowcast_panel.duckdb
+
+# Regenerate with: python scripts/ingest_real_data.py --eia-jsonl ... --noaa-dir ... --ip-xlsx ...
+# (writes data/real_energy_panel.duckdb; data/real_monthly_panel.csv is the small committed CSV
+# mirror of the same rows and is not ignored)
+data/real_energy_panel.duckdb

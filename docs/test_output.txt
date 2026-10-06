@@ -3,21 +3,29 @@ platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Manas\D
 cachedir: .pytest_cache
 rootdir: C:\Users\Manas\Downloads\Auto Job Applier\Total Job Application process flow
 configfile: pytest.ini
-collecting ... collected 14 items
+collecting ... collected 22 items
 
-tests\test_index_builder.py::test_requires_minimum_history_months PASSED [  7%]
-tests\test_index_builder.py::test_equal_weight_combination_matches_hand_calculation PASSED [ 14%]
-tests\test_index_builder.py::test_future_reference_periods_are_excluded_from_target PASSED [ 21%]
-tests\test_nowcast.py::test_name_count_and_coverage_spread PASSED        [ 28%]
-tests\test_nowcast.py::test_monthly_decomposition_sums_to_quarterly_truth PASSED [ 35%]
-tests\test_nowcast.py::test_point_in_time_excludes_not_yet_visible PASSED [ 42%]
-tests\test_nowcast.py::test_oracle_matches_fast_path_point_in_time PASSED [ 50%]
-tests\test_nowcast.py::test_quarter_table_has_two_of_three_months_only PASSED [ 57%]
-tests\test_nowcast.py::test_oos_r2_hand_computation PASSED               [ 64%]
-tests\test_nowcast.py::test_coverage_terciles_partition_all_names PASSED [ 71%]
-tests\test_vintage_store.py::test_point_in_time_returns_latest_visible_revision PASSED [ 78%]
-tests\test_vintage_store.py::test_point_in_time_excludes_vintages_not_yet_released PASSED [ 85%]
-tests\test_vintage_store.py::test_filter_before_dedup_regression PASSED  [ 92%]
+tests\test_index_builder.py::test_requires_minimum_history_months PASSED [  4%]
+tests\test_index_builder.py::test_equal_weight_combination_matches_hand_calculation PASSED [  9%]
+tests\test_index_builder.py::test_future_reference_periods_are_excluded_from_target PASSED [ 13%]
+tests\test_nowcast.py::test_name_count_and_coverage_spread PASSED        [ 18%]
+tests\test_nowcast.py::test_monthly_decomposition_sums_to_quarterly_truth PASSED [ 22%]
+tests\test_nowcast.py::test_point_in_time_excludes_not_yet_visible PASSED [ 27%]
+tests\test_nowcast.py::test_oracle_matches_fast_path_point_in_time PASSED [ 31%]
+tests\test_nowcast.py::test_quarter_table_has_two_of_three_months_only PASSED [ 36%]
+tests\test_nowcast.py::test_oos_r2_hand_computation PASSED               [ 40%]
+tests\test_nowcast.py::test_coverage_terciles_partition_all_names PASSED [ 45%]
+tests\test_real_nowcast.py::test_panel_has_25_balancing_authorities_and_real_date_range PASSED [ 50%]
+tests\test_real_nowcast.py::test_calendar_month_anomaly_uses_only_strictly_prior_years PASSED [ 54%]
+tests\test_real_nowcast.py::test_calendar_month_anomaly_never_sees_a_same_or_later_index PASSED [ 59%]
+tests\test_real_nowcast.py::test_pct_growth_handles_zero_and_missing PASSED [ 63%]
+tests\test_real_nowcast.py::test_oracle_matches_fast_path_walk_forward PASSED [ 68%]
+tests\test_real_nowcast.py::test_walk_forward_never_trains_on_the_target_month_or_later PASSED [ 72%]
+tests\test_real_nowcast.py::test_sql_vs_python_total_demand_matches_exactly PASSED [ 77%]
+tests\test_real_nowcast.py::test_run_all_measurements_reports_every_claim_shape PASSED [ 81%]
+tests\test_vintage_store.py::test_point_in_time_returns_latest_visible_revision PASSED [ 86%]
+tests\test_vintage_store.py::test_point_in_time_excludes_vintages_not_yet_released PASSED [ 90%]
+tests\test_vintage_store.py::test_filter_before_dedup_regression PASSED  [ 95%]
 tests\test_vintage_store.py::test_latest_periods_as_of_returns_plain_date_not_timestamp PASSED [100%]
 
-============================= 14 passed in 2.41s ==============================
+============================= 22 passed in 2.24s ==============================
