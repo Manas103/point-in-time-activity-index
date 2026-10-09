@@ -1,0 +1,67 @@
+=== two_vendor_reconciliation ===
+{
+  "value": true,
+  "n_series": 85,
+  "n_releases_checked": 128,
+  "n_comparisons": 43010
+}
+
+=== append_only_store ===
+{
+  "value": true,
+  "vendor_a": {
+    "value": true,
+    "rows_before": 3,
+    "rows_after_restatement": 4,
+    "original_value_still_recoverable_at_its_own_as_of_date": true
+  },
+  "vendor_b": {
+    "value": true,
+    "rows_before": 3,
+    "rows_after_restatement": 4,
+    "original_value_still_recoverable_at_its_own_as_of_date": true
+  }
+}
+
+=== disagreement_attribution ===
+{
+  "value": 99.91,
+  "total_disagreements": 4641,
+  "attributed": 4637,
+  "attribution_rate_pct": 99.914,
+  "meets_1900_floor": true
+}
+
+=== vendor_choice_pricing ===
+{
+  "value": 0.3523,
+  "mean_abs_vendor_choice_impact_index_points": 0.3523,
+  "median_abs_vendor_choice_impact_index_points": 0.3815,
+  "max_abs_vendor_choice_impact_index_points": 0.8117,
+  "latest_period": "2026-08-01",
+  "latest_period_abs_diff_index_points": 0.6435,
+  "n_periods": 105,
+  "baseline_mean_abs_revision_index_points": 0.0813,
+  "vendor_choice_impact_exceeds_baseline_revision": true
+}
+
+=== disagreement cause counts (all releases checked) ===
+{
+  "coverage_gap": 1500,
+  "unit_scaling": 1497,
+  "late_correction": 611,
+  "duplicate_release": 476,
+  "revision_timing": 285,
+  "stale_carry_forward": 268,
+  "unexplained": 4
+}
+
+=== disagreements by lag_months ===
+lag_months
+0    1316
+1    1108
+2    1218
+3     999
+
+=== first-vintage-only disagreement count (lag_months == 0) ===
+1316

@@ -16,3 +16,8 @@ data/nowcast_panel.duckdb
 # (writes data/real_energy_panel.duckdb; data/real_monthly_panel.csv is the small committed CSV
 # mirror of the same rows and is not ignored)
 data/real_energy_panel.duckdb
+
+# Regenerate with: python scripts/build_vendor_reconciliation.py
+# (writes data/vendor_reconciliation.duckdb, both vendors' vintage logs plus
+# the reconciliation_results table scripts/run_vendor_measurements.py adds)
+data/vendor_reconciliation.duckdb
