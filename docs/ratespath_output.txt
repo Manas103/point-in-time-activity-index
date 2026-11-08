@@ -1,0 +1,40 @@
+=== Reprice tolerance (16-meeting path vs. 11 OIS curve pillars) ===
+{
+  "n_pillars": 11,
+  "max_abs_reprice_error_bp": 1.1320793689434394,
+  "per_pillar_error_bp": {
+    "0.0833": -0.061708,
+    "0.1667": -0.853391,
+    "0.25": -1.132079,
+    "0.3333": -0.152659,
+    "0.5": -0.181959,
+    "0.75": -0.118093,
+    "1.0": -0.051093,
+    "1.25": -0.043662,
+    "1.5": -0.043233,
+    "1.75": -0.099646,
+    "2.0": -0.040653
+  },
+  "meets_tolerance": false,
+  "oracle_max_abs_diff": 0.0
+}
+
+=== Release count and join ===
+{
+  "n_releases_generated": 180,
+  "n_releases_joined_to_a_meeting": 169,
+  "n_meetings": 16
+}
+
+=== Event study: policy-path sensitivity to macro surprises ===
+{
+  "n_releases": 180,
+  "n_meetings": 16,
+  "sensitivity_1y_bp_per_std_pit": 2.9897647177939817,
+  "sensitivity_3y_bp_per_std_pit": 0.8893042556013376,
+  "sensitivity_1y_bp_per_std_revised": 4.254681844538913,
+  "sensitivity_3y_bp_per_std_revised": 1.0822542947397242,
+  "front_end_overstatement_pct": 42.30824985045175,
+  "oracle_max_abs_diff_1y": 4.440892098500626e-16,
+  "oracle_max_abs_diff_3y": 1.1102230246251565e-16
+}
